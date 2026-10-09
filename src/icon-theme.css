@@ -1,0 +1,32 @@
+/* Home Thames v2.2 — imported Streamline Ultimate PNG icon set. */
+.st-icon {
+  display:inline-block;
+  flex:none;
+  vertical-align:middle;
+  box-sizing:border-box;
+  background-color:currentColor;
+  -webkit-mask-image:var(--st-source);
+  mask-image:var(--st-source);
+  -webkit-mask-size:contain;
+  mask-size:contain;
+  -webkit-mask-position:center;
+  mask-position:center;
+  -webkit-mask-repeat:no-repeat;
+  mask-repeat:no-repeat;
+}
+/* Large hit targets, small precise icons — card tones also tint the PNG artwork. */
+.device-icon,.pair-choice-icon,.pair-big-ic,.panel-icon,.reading-ic,.stat-symbol,.room-icon,.home-thumb,.brand-mark {
+  flex-shrink:0;
+}
+.device-icon .st-icon,.pair-choice-icon .st-icon,.panel-icon .st-icon,.reading-ic .st-icon,.stat-symbol .st-icon {
+  filter:drop-shadow(0 1px 0 rgb(255 255 255 / .12));
+}
+.nav button .st-icon,.mobile-nav button .st-icon {opacity:.93;transition:opacity .15s ease}
+.nav button.active .st-icon,.mobile-nav button.active .st-icon {opacity:1}
+.device-card:hover .device-icon,.pair-device-choice:hover .pair-choice-icon {transform:translateY(-1px);transition:transform .18s ease}
+.header-add .st-icon {flex-shrink:0}
+@media(max-width:540px) {
+  .header-add .st-icon {width:19px!important;height:19px!important}
+  .device-icon .st-icon {width:23px!important;height:23px!important}
+  .mobile-nav .st-icon {width:21px!important;height:21px!important}
+}

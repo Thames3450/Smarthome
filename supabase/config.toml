@@ -1,0 +1,11 @@
+project_id = "home-thames-smart-home"
+[functions.device-register]
+verify_jwt = false
+[functions.device-sync]
+verify_jwt = false
+[functions.claim-device]
+verify_jwt = false  # User JWT is validated in the function via getUser()
+[functions.run-automations]
+verify_jwt = false  # Requires CRON_SECRET header
+[functions.device-renew]
+verify_jwt = false

@@ -1,0 +1,12 @@
+{
+  "name": "home-thames-smart-home-cloud",
+  "private": true,
+  "version": "2.6.0",
+  "type": "module",
+  "description": "Dependency-free PWA frontend + Supabase Cloud + ESP32-C6 firmware",
+  "scripts": {
+    "serve": "npx --yes http-server . -p 8080",
+    "check": "node --check src/app.js && node --check src/cloud.js && node --check src/demo.js && node --check src/icons.js && node --check src/energy.js && node --check sw.js",
+    "test": "node --test tests/*.test.mjs"
+  }
+}
