@@ -1,3 +1,5 @@
+// @ts-nocheck
+// Ported from the existing Home Thames business layer; API contracts preserved.
 // Shared historical-energy date logic. Dates are calendar dates in the home's timezone.
 export const PERIODS = ['day','week','month','year'];
 export const TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];

@@ -1,7 +1,5 @@
-.DS_Store
-.env
-.env.*
-!.env.example
 node_modules/
-firmware/**/.pio/
-firmware/**/include/secrets.h
+dist/
+.env.local
+.env.*.local
+.DS_Store

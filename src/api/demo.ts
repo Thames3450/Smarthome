@@ -1,4 +1,6 @@
-import {aggregateDemo,homeToday,sumKwh,shiftPeriod} from './energy.js';
+// @ts-nocheck
+// Ported from the existing Home Thames business layer; API contracts preserved.
+import {aggregateDemo,homeToday,sumKwh,shiftPeriod} from '../lib/energy';
 const key='home_thames_demo_v1';
 const id=()=>globalThis.crypto?.randomUUID?.()||`demo-${Math.random().toString(36).slice(2)}`;
 const hour=(h)=>new Date(Date.now()-h*3600000).toISOString();

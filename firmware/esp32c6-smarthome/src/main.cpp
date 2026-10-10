@@ -21,6 +21,9 @@ PZEM004Tv30 pzem(pzemUart, PZEM_RX_GPIO, PZEM_TX_GPIO);
 String wifiSsid, wifiPass, deviceId, deviceToken, pairingCode, enrollmentTicket;
 String hardwareId, apPassword;
 bool apRunning=false, isPaired=false;
+bool portalRoutesRegistered=false;
+unsigned long wifiLostAt=0,bootHoldAt=0;
+bool bootActionDone=false;
 unsigned long lastSync=0,lastReconnect=0,lastPairRenew=0;
 struct Ack { String id; bool success; } ackQueue[5];
 int ackCount=0;
@@ -35,6 +38,7 @@ String randomPass(int length) {
 }
 String setupPage(){
  String code=pairingCode.length()?htmlEsc(pairingCode):"กำลังรอการเชื่อม Wi-Fi และลงทะเบียนคลาวด์";
+ const bool alreadyRegistered = deviceId.length() && deviceToken.length();
  String page=R"HTML(<!doctype html><html lang="th"><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta charset="utf-8"><title>Home Thames ตั้งค่าอุปกรณ์</title><style>
  *{box-sizing:border-box}body{font:15px system-ui,-apple-system,sans-serif;color:#1c365a;background:#f2f7ff;margin:0;padding:18px}
  main{max-width:430px;margin:30px auto;background:white;border:1px solid #e4edfa;box-shadow:0 12px 40px #193f7922;padding:24px;border-radius:20px}
@@ -47,25 +51,38 @@ String setupPage(){
  page+=htmlEsc(hardwareId);
  page+=R"HTML(<br><b>สถานะ Wi-Fi:</b> )HTML";
  page+=WiFi.status()==WL_CONNECTED?"เชื่อมต่อแล้ว: "+htmlEsc(WiFi.SSID()):"ยังไม่เชื่อมต่อ";
- page+=R"HTML(</div><h3>1. เชื่อมต่อ Wi-Fi บ้าน</h3><p class="muted">เลือก Wi-Fi บ้านคลื่น 2.4 GHz และกรอกรหัสอนุญาตติดตั้งจากหน้าเว็บ Home Thames รหัส Wi-Fi จะเก็บไว้ใน ESP32 ไม่ส่งขึ้น Cloud</p>
+ page+=R"HTML(</div><h3>1. เชื่อมต่อ Wi-Fi บ้าน</h3><p class="muted">เลือกเครือข่าย 2.4 GHz สำหรับสถานที่นี้ รหัสผ่าน Wi-Fi จะถูกเก็บไว้ในบอร์ด ไม่ส่งขึ้น Cloud</p>
  <button type="button" class="outline" onclick="scan()">สแกน Wi-Fi ใกล้เคียง</button>
  <div id="scanstatus" class="muted">กดสแกนเพื่อค้นหาเครือข่ายที่อยู่ใกล้</div>
  <form action="/save" method="post"><label for="ssid">ชื่อ Wi-Fi บ้าน (SSID)</label>
  <input id="ssid" name="ssid" maxlength="32" required placeholder="เลือกหรือพิมพ์ชื่อ Wi-Fi" list="networks" autocomplete="off"><datalist id="networks"></datalist>
- <label for="password">รหัสผ่าน Wi-Fi</label><input id="password" name="password" type="password" minlength="8" maxlength="63" required autocomplete="off" placeholder="รหัสผ่าน Wi-Fi บ้าน"><label for="ticket">รหัสอนุญาตติดตั้งจาก Home Thames (48 ตัวอักษร)</label><input id="ticket" name="ticket" type="text" minlength="48" maxlength="48" required autocomplete="off" placeholder="คัดลอกจากเว็บ Home Thames"><button>บันทึกและเชื่อมต่อ Wi-Fi</button></form>
- <hr><h3>2. จับคู่กับ Home Thames</h3><p class="muted">เมื่อบอร์ดเชื่อมต่ออินเทอร์เน็ตได้แล้ว จะมีรหัสจับคู่ชั่วคราว ให้นำไปใส่ใน Home Thames → เพิ่มอุปกรณ์ → จับคู่และตั้งชื่อ</p><div class="code">)HTML";
- page+=code;
- page+=R"HTML(</div><button class="outline" onclick="location.reload()">รีเฟรชรหัสจับคู่</button><p class="muted">เพื่อความปลอดภัย Wi-Fi ตั้งค่าจะปิดหลังจับคู่สำเร็จ อย่าแชร์รหัสจับคู่หรือรหัส Wi-Fi ตั้งค่า</p></main>
+ <label for="password">รหัสผ่าน Wi-Fi</label><input id="password" name="password" type="password" minlength="8" maxlength="63" required autocomplete="off" placeholder="รหัสผ่าน Wi-Fi บ้าน">)HTML";
+ if (!alreadyRegistered) {
+   page+=R"HTML(<label for="ticket">รหัสอนุญาตติดตั้งจาก Home Thames (48 ตัวอักษร)</label><input id="ticket" name="ticket" type="text" minlength="48" maxlength="48" required autocomplete="off" placeholder="คัดลอกจากเว็บ Home Thames">)HTML";
+ } else {
+   page+=R"HTML(<div class="status">✓ อุปกรณ์นี้จับคู่กับ Home Thames ไว้แล้ว เปลี่ยน Wi-Fi ได้ทันที <b>ไม่ต้องขอรหัสติดตั้งใหม่</b> และข้อมูลย้อนหลังจะยังอยู่</div>)HTML";
+ }
+ page+=R"HTML(<button>บันทึกและเชื่อมต่อ Wi-Fi</button></form>)HTML";
+ if (!alreadyRegistered) {
+  page+=R"HTML(<hr><h3>2. จับคู่กับ Home Thames</h3><p class="muted">หลังเชื่อมต่ออินเทอร์เน็ต บอร์ดจะแสดงรหัสจับคู่ชั่วคราว ให้นำไปใส่ในเว็บ Home Thames → เพิ่มอุปกรณ์</p><div class="code">)HTML";
+  page+=code;
+  page+=R"HTML(</div>)HTML";
+ }
+ page+=R"HTML(<button class="outline" onclick="location.reload()">รีเฟรชสถานะ</button><p class="muted">หลังต่อ Wi-Fi บ้านสำเร็จ AP ตั้งค่าจะปิดเอง หากย้ายที่และต้องเปลี่ยน Wi-Fi อีก ให้กดปุ่ม BOOT ค้าง 5 วินาทีขณะบอร์ดเปิดทำงาน หรือพิมพ์ WIFI_RESET ทาง USB</p></main>
  <script>async function scan(){const s=document.getElementById('scanstatus');s.textContent='กำลังสแกน…';try{const r=await fetch('/networks',{cache:'no-store'});if(!r.ok)throw Error('scan failed');const rows=await r.json(),list=document.getElementById('networks');list.replaceChildren();for(const x of rows){const o=document.createElement('option');o.value=x.ssid;o.label=x.ssid+' ('+x.rssi+' dBm)';list.append(o)}s.textContent=rows.length+' เครือข่ายที่พบ กดช่องชื่อ Wi-Fi เพื่อเลือกหรือพิมพ์เอง';}catch(e){s.textContent='สแกนไม่ได้ คุณยังพิมพ์ชื่อ Wi-Fi เองได้'}}</script>
  </body></html>)HTML";
  return page;
 }
 void setupPortal(){
  if(apRunning)return;
- apPassword=randomPass(12);
+ // Stable random AP password: print it once and keep it on your device label.
+ // The setup AP never uses a guessable default password.
+ apPassword=prefs.getString("setup_key", "");
+ if(apPassword.length()<12){apPassword=randomPass(14);prefs.putString("setup_key",apPassword);}
  String apName="HomeThames-Setup-"+hardwareId.substring(hardwareId.length()-4);
  WiFi.mode(WIFI_AP_STA);
  WiFi.softAP(apName.c_str(),apPassword.c_str());
+ if (!portalRoutesRegistered) {
  server.on("/",HTTP_GET,[]{server.sendHeader("Cache-Control","no-store");server.send(200,"text/html; charset=utf-8",setupPage());});
  server.on("/networks",HTTP_GET,[]{
    int count=WiFi.scanNetworks(false,false);JsonDocument doc;JsonArray networks=doc.to<JsonArray>();
@@ -79,20 +96,47 @@ void setupPortal(){
  server.on("/save",HTTP_POST,[]{
    const String ssid=server.arg("ssid"),pass=server.arg("password"),ticket=server.arg("ticket");
    if(ssid.length()<1||ssid.length()>32||pass.length()<8||pass.length()>63){server.send(400,"text/plain","ข้อมูล Wi-Fi ไม่ถูกต้อง");return;}
-   if(ticket.length()!=48){server.send(400,"text/plain","รหัสอนุญาตติดตั้งไม่ครบ 48 ตัวอักษร");return;}
-   for(size_t i=0;i<ticket.length();i++)if(!isxdigit(ticket[i])){server.send(400,"text/plain","รหัสอนุญาตไม่ถูกต้อง");return;}
-   enrollmentTicket=ticket; enrollmentTicket.toUpperCase();
-   prefs.putString("enroll_ticket",enrollmentTicket);
+   // Cloud credentials are retained during Wi-Fi changes.
+   // A one-time enrollment ticket is required ONLY before first registration.
+   if(deviceId.isEmpty() || deviceToken.isEmpty()){
+     if(ticket.length()!=48){server.send(400,"text/plain","กรุณากรอกรหัสอนุญาตติดตั้ง 48 ตัวอักษร");return;}
+     for(size_t i=0;i<ticket.length();i++)if(!isxdigit(ticket[i])){server.send(400,"text/plain","รหัสอนุญาตไม่ถูกต้อง");return;}
+     enrollmentTicket=ticket;enrollmentTicket.toUpperCase();
+     prefs.putString("enroll_ticket",enrollmentTicket);
+   }
    wifiSsid=ssid;wifiPass=pass;
    prefs.putString("ssid",wifiSsid);prefs.putString("password",wifiPass);
    server.send(200,"text/html; charset=utf-8","<meta name=viewport content=width=device-width,initial-scale=1><div style=font-family:system-ui;max-width:480px;margin:15vh auto;padding:25px><h2>บันทึก Wi-Fi ของ Home Thames แล้ว</h2><p>รอ 15–30 วินาที แล้วกลับไปที่ <a href='/'>หน้าตั้งค่าอุปกรณ์</a> เพื่อตรวจสถานะและรหัสจับคู่</p><p>ถ้าบอร์ดเชื่อมต่อไม่ได้ ให้ตรวจว่า Wi-Fi ที่เลือกเป็น 2.4 GHz</p></div>");
    WiFi.begin(wifiSsid.c_str(),wifiPass.c_str());
  });
  server.onNotFound([]{server.send(404,"text/plain","ไม่พบหน้าที่ขอ");});
+ portalRoutesRegistered=true;
+ }
  server.begin();apRunning=true;
  Serial.printf("\nSETUP AP: %s\nSETUP PASSWORD: %s\nOPEN: http://192.168.4.1\n",apName.c_str(),apPassword.c_str());
 }
 void stopPortal(){if(!apRunning)return;server.stop();WiFi.softAPdisconnect(true);apRunning=false;WiFi.mode(WIFI_STA);}
+
+// Only remove the home Wi-Fi credentials. Device identity/token and pairing are preserved.
+void resetWifiOnly(){
+  Serial.println("WIFI RESET: preserving Home Thames device identity and pairing");
+  prefs.remove("ssid");prefs.remove("password");
+  wifiSsid="";wifiPass="";
+  WiFi.disconnect(false,true);
+  wifiLostAt=0;
+  setupPortal();
+}
+
+// Detect BOOT GPIO9 while firmware is running (NOT during reboot/flash).
+// Prevent a held button from repeatedly triggering resets.
+void pollBootButton(){
+  bool pressed=(digitalRead(WIFI_SETUP_BUTTON_GPIO)==LOW);
+  if(!pressed){bootHoldAt=0;bootActionDone=false;return;}
+  if(bootHoldAt==0)bootHoldAt=millis();
+  if(!bootActionDone && millis()-bootHoldAt>=WIFI_BUTTON_HOLD_MS){
+    bootActionDone=true;resetWifiOnly();
+  }
+}
 
 bool cloudPost(const String& route, JsonDocument& input, JsonDocument& output, bool withToken){
   if(WiFi.status()!=WL_CONNECTED)return false;
@@ -194,6 +238,7 @@ void synchronize(){
 void setup(){
  Serial.begin(115200);delay(700);
  prefs.begin("homethames",false);
+ pinMode(WIFI_SETUP_BUTTON_GPIO,INPUT_PULLUP);
  hardwareId="ESP32C6-"+String((uint32_t)(ESP.getEfuseMac()>>24),HEX)+String((uint32_t)(ESP.getEfuseMac()&0xFFFFFF),HEX);
  hardwareId.toUpperCase();
  wifiSsid=prefs.getString("ssid","");wifiPass=prefs.getString("password","");
@@ -206,19 +251,33 @@ void setup(){
  #endif
  pzemUart.begin(9600,SERIAL_8N1,PZEM_RX_GPIO,PZEM_TX_GPIO);
  WiFi.mode(WIFI_STA);
+ wifiLostAt=millis();
  if(wifiSsid.length())WiFi.begin(wifiSsid.c_str(),wifiPass.c_str());
  if(!wifiSsid.length() || !deviceId.length() || !isPaired)setupPortal();
  Serial.println("Home Thames ESP32-C6 firmware started");
 }
 void loop(){
- // Serial factory reset requires physical USB access. Type RESET and Enter at 115200.
+ // Commands via USB: INFO, WIFI_SETUP, WIFI_RESET (keeps Cloud identity), RESET (factory).
  if(Serial.available()){
    String cmd=Serial.readStringUntil('\n');cmd.trim();
-   if(cmd=="RESET"){
-     prefs.clear();Serial.println("Home Thames local credentials cleared; restarting");delay(400);ESP.restart();
+   if(cmd=="WIFI_RESET")resetWifiOnly();
+   else if(cmd=="WIFI_SETUP")setupPortal();
+   else if(cmd=="INFO"){
+     Serial.printf("Home Thames ID: %s\nWi-Fi: %s\nPaired: %s\n",hardwareId.c_str(),wifiSsid.c_str(),isPaired?"yes":"no");
+     Serial.printf("Setup AP name: HomeThames-Setup-%s\nSetup AP password: %s\n",hardwareId.substring(hardwareId.length()-4).c_str(),prefs.getString("setup_key", "(not created)").c_str());
+   }
+   else if(cmd=="RESET"){
+     prefs.clear();Serial.println("FACTORY RESET: Wi-Fi and Cloud identity cleared; restarting");delay(400);ESP.restart();
    }
  }
+ pollBootButton();
  if(apRunning)server.handleClient();
+ if(WiFi.status()==WL_CONNECTED){wifiLostAt=0;}
+ else if(wifiSsid.length()){
+   if(wifiLostAt==0)wifiLostAt=millis();
+   // If the old access point is unavailable for 90 s, open setup automatically.
+   if(!apRunning && millis()-wifiLostAt>=WIFI_AUTO_SETUP_AFTER_MS)setupPortal();
+ }
  if(WiFi.status()!=WL_CONNECTED&&wifiSsid.length()&&millis()-lastReconnect>RECONNECT_INTERVAL_MS){
   lastReconnect=millis();WiFi.begin(wifiSsid.c_str(),wifiPass.c_str());
  }

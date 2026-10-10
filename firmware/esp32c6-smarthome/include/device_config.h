@@ -13,4 +13,9 @@
 
 #define TELEMETRY_INTERVAL_MS 10000UL
 #define RECONNECT_INTERVAL_MS 10000UL
-#define FIRMWARE_VERSION "2.5.0"
+// Waveshare ESP32-C6-Zero BOOT button = GPIO9 (also bootstrapping pin).
+// Use only as a long-press key AFTER the board has booted.
+#define WIFI_SETUP_BUTTON_GPIO 9
+#define WIFI_BUTTON_HOLD_MS 5000UL
+#define WIFI_AUTO_SETUP_AFTER_MS 90000UL
+#define FIRMWARE_VERSION "2.8.0"

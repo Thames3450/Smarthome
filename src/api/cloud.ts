@@ -1,4 +1,6 @@
-const config=()=>window.SMART_HOME_CONFIG||{};
+// @ts-nocheck
+// Ported from the existing Home Thames business layer; API contracts preserved.
+const config=()=>({SUPABASE_URL:import.meta.env.VITE_SUPABASE_URL||'', SUPABASE_ANON_KEY:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||''});
 const sessionKey='home_thames_session_v1';
 let session;
 let refreshPromise=null;
